@@ -16,15 +16,20 @@ type RedisBackend struct {
 	config   *config.Config
 	host     string
 	password string
-	conn     redis.Conn
+	db       int
+	pool     *redis.Pool
+	// If set, path to a socket file overrides hostname
+	socketPath string
 }
 
 // NewRedisBackend creates RedisBackend instance
-func NewRedisBackend(cnf *config.Config, host, password string) Backend {
+func NewRedisBackend(cnf *config.Config, host, password, socketPath string, db int) Backend {
 	return Backend(&RedisBackend{
-		config:   cnf,
-		host:     host,
-		password: password,
+		config:     cnf,
+		host:       host,
+		db:         db,
+		password:   password,
+		socketPath: socketPath,
 	})
 }
 
@@ -40,10 +45,7 @@ func (redisBackend *RedisBackend) InitGroup(groupUUID string, taskUUIDs []string
 		return err
 	}
 
-	conn, err := redisBackend.open()
-	if err != nil {
-		return err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
 	_, err = conn.Do("SET", groupUUID, encoded)
@@ -119,12 +121,9 @@ func (redisBackend *RedisBackend) SetStateFailure(signature *signatures.TaskSign
 
 // GetState - returns the latest task state
 func (redisBackend *RedisBackend) GetState(taskUUID string) (*TaskState, error) {
-	taskState := TaskState{}
+	taskState := new(TaskState)
 
-	conn, err := redisBackend.open()
-	if err != nil {
-		return nil, err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
 	item, err := redis.Bytes(conn.Do("GET", taskUUID))
@@ -132,22 +131,19 @@ func (redisBackend *RedisBackend) GetState(taskUUID string) (*TaskState, error) 
 		return nil, err
 	}
 
-	if err := json.Unmarshal(item, &taskState); err != nil {
+	if err := json.Unmarshal(item, taskState); err != nil {
 		return nil, err
 	}
 
-	return &taskState, nil
+	return taskState, nil
 }
 
 // PurgeState - deletes stored task state
 func (redisBackend *RedisBackend) PurgeState(taskUUID string) error {
-	conn, err := redisBackend.open()
-	if err != nil {
-		return err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
-	_, err = conn.Do("DEL", taskUUID)
+	_, err := conn.Do("DEL", taskUUID)
 	if err != nil {
 		return err
 	}
@@ -157,13 +153,10 @@ func (redisBackend *RedisBackend) PurgeState(taskUUID string) error {
 
 // PurgeGroupMeta - deletes stored group meta data
 func (redisBackend *RedisBackend) PurgeGroupMeta(groupUUID string) error {
-	conn, err := redisBackend.open()
-	if err != nil {
-		return err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
-	_, err = conn.Do("DEL", groupUUID)
+	_, err := conn.Do("DEL", groupUUID)
 	if err != nil {
 		return err
 	}
@@ -173,10 +166,7 @@ func (redisBackend *RedisBackend) PurgeGroupMeta(groupUUID string) error {
 
 // Fetches GroupMeta from the backend, convenience function to avoid repetition
 func (redisBackend *RedisBackend) getGroupMeta(groupUUID string) (*GroupMeta, error) {
-	conn, err := redisBackend.open()
-	if err != nil {
-		return nil, err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
 	item, err := redis.Bytes(conn.Do("GET", groupUUID))
@@ -184,12 +174,12 @@ func (redisBackend *RedisBackend) getGroupMeta(groupUUID string) (*GroupMeta, er
 		return nil, err
 	}
 
-	groupMeta := GroupMeta{}
+	groupMeta := new(GroupMeta)
 	if err := json.Unmarshal(item, &groupMeta); err != nil {
 		return nil, err
 	}
 
-	return &groupMeta, nil
+	return groupMeta, nil
 }
 
 // getStates Returns multiple task states with MGET
@@ -199,10 +189,7 @@ func (redisBackend *RedisBackend) getStates(taskUUIDs ...string) ([]*TaskState, 
 	log.Print("Getting states")
 	log.Print(taskUUIDs)
 
-	conn, err := redisBackend.open()
-	if err != nil {
-		return taskStates, err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
 	// conn.Do requires []interface{}... can't pass []string unfortunately
@@ -222,13 +209,13 @@ func (redisBackend *RedisBackend) getStates(taskUUIDs ...string) ([]*TaskState, 
 			return taskStates, fmt.Errorf("Expected byte array, instead got: %v", value)
 		}
 
-		taskState := TaskState{}
-		if err := json.Unmarshal(bytes, &taskState); err != nil {
+		taskState := new(TaskState)
+		if err := json.Unmarshal(bytes, taskState); err != nil {
 			log.Print(err)
 			return taskStates, err
 		}
 
-		taskStates[i] = &taskState
+		taskStates[i] = taskState
 	}
 
 	return taskStates, nil
@@ -241,10 +228,7 @@ func (redisBackend *RedisBackend) updateState(taskState *TaskState) error {
 		return err
 	}
 
-	conn, err := redisBackend.open()
-	if err != nil {
-		return err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
 	_, err = conn.Do("SET", taskState.TaskUUID, encoded)
@@ -264,13 +248,10 @@ func (redisBackend *RedisBackend) setExpirationTime(key string) error {
 	}
 	expirationTimestamp := int32(time.Now().Unix() + int64(expiresIn))
 
-	conn, err := redisBackend.open()
-	if err != nil {
-		return err
-	}
+	conn := redisBackend.open()
 	defer conn.Close()
 
-	_, err = conn.Do("EXPIREAT", key, expirationTimestamp)
+	_, err := conn.Do("EXPIREAT", key, expirationTimestamp)
 	if err != nil {
 		return err
 	}
@@ -279,10 +260,47 @@ func (redisBackend *RedisBackend) setExpirationTime(key string) error {
 }
 
 // Returns / creates instance of Redis connection
-func (redisBackend *RedisBackend) open() (redis.Conn, error) {
-	if redisBackend.password != "" {
-		return redis.Dial("tcp", redisBackend.host,
-			redis.DialPassword(redisBackend.password))
+func (redisBackend *RedisBackend) open() redis.Conn {
+	if redisBackend.pool == nil {
+		redisBackend.pool = redisBackend.newPool()
 	}
-	return redis.Dial("tcp", redisBackend.host)
+	return redisBackend.pool.Get()
+}
+
+// Returns a new pool of Redis connections
+func (redisBackend *RedisBackend) newPool() *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			var (
+				c    redis.Conn
+				err  error
+				opts = make([]redis.DialOption, 0)
+			)
+
+			if redisBackend.password != "" {
+				opts = append(opts, redis.DialPassword(redisBackend.password))
+			}
+
+			if redisBackend.socketPath != "" {
+				c, err = redis.Dial("unix", redisBackend.socketPath, opts...)
+			} else {
+				c, err = redis.Dial("tcp", redisBackend.host, opts...)
+			}
+
+			if redisBackend.db != 0 {
+				_, err = c.Do("SELECT", redisBackend.db)
+			}
+
+			if err != nil {
+				return nil, err
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }

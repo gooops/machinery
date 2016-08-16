@@ -1,7 +1,9 @@
 package machinery
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/RichardKnop/machinery/v1/backends"
@@ -17,6 +19,7 @@ func BrokerFactory(cnf *config.Config) (brokers.Broker, error) {
 	}
 
 	if strings.HasPrefix(cnf.Broker, "redis://") {
+
 		parts := strings.Split(cnf.Broker, "redis://")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf(
@@ -25,17 +28,20 @@ func BrokerFactory(cnf *config.Config) (brokers.Broker, error) {
 			)
 		}
 
-		var redisHost, redisPassword string
+		redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.Broker)
+		if err != nil {
+			return nil, err
+		}
+		return brokers.NewRedisBroker(cnf, redisHost, redisPassword, "", redisDB), nil
+	}
 
-		parts = strings.Split(parts[1], "@")
-		if len(parts) == 2 {
-			redisHost = parts[1]
-			redisPassword = parts[0]
-		} else {
-			redisHost = parts[0]
+	if strings.HasPrefix(cnf.Broker, "redis+socket://") {
+		redisSocket, redisPassword, redisDB, err := ParseRedisSocketURL(cnf.Broker)
+		if err != nil {
+			return nil, err
 		}
 
-		return brokers.NewRedisBroker(cnf, redisHost, redisPassword), nil
+		return brokers.NewRedisBroker(cnf, "", redisPassword, redisSocket, redisDB), nil
 	}
 
 	if strings.HasPrefix(cnf.Broker, "eager") {
@@ -65,25 +71,25 @@ func BackendFactory(cnf *config.Config) (backends.Backend, error) {
 	}
 
 	if strings.HasPrefix(cnf.ResultBackend, "redis://") {
-		parts := strings.Split(cnf.ResultBackend, "redis://")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf(
-				"Redis result backend connection string should be in format redis://password@host:port, instead got %s",
-				cnf.ResultBackend,
-			)
+		redisHost, redisPassword, redisDB, err := ParseRedisURL(cnf.ResultBackend)
+		if err != nil {
+			return nil, err
 		}
 
-		var redisHost, redisPassword string
+		return backends.NewRedisBackend(cnf, redisHost, redisPassword, "", redisDB), nil
+	}
 
-		parts = strings.Split(parts[1], "@")
-		if len(parts) == 2 {
-			redisHost = parts[1]
-			redisPassword = parts[0]
-		} else {
-			redisHost = parts[0]
+	if strings.HasPrefix(cnf.ResultBackend, "redis+socket://") {
+		redisSocket, redisPassword, redisDB, err := ParseRedisSocketURL(cnf.ResultBackend)
+		if err != nil {
+			return nil, err
 		}
 
-		return backends.NewRedisBackend(cnf, redisHost, redisPassword), nil
+		return backends.NewRedisBackend(cnf, "", redisPassword, redisSocket, redisDB), nil
+	}
+
+	if strings.HasPrefix(cnf.ResultBackend, "mongodb://") {
+		return backends.NewMongodbBackend(cnf)
 	}
 
 	if strings.HasPrefix(cnf.ResultBackend, "eager") {
@@ -91,4 +97,90 @@ func BackendFactory(cnf *config.Config) (backends.Backend, error) {
 	}
 
 	return nil, fmt.Errorf("Factory failed with result backend: %v", cnf.ResultBackend)
+}
+
+// ParseRedisURL ...
+func ParseRedisURL(url string) (host, password string, db int, err error) {
+	// redis://pwd@host/db
+
+	parts := strings.Split(url, "redis://")
+	if parts[0] != "" {
+		err = errors.New("No redis scheme found")
+		return
+	}
+	if len(parts) != 2 {
+		err = fmt.Errorf("Redis connection string should be in format redis://password@host:port/db, instead got %s", url)
+		return
+	}
+	parts = strings.Split(parts[1], "@")
+	var hostAndDB string
+	if len(parts) == 2 {
+		//[pwd, host/db]
+		password = parts[0]
+		hostAndDB = parts[1]
+	} else {
+		hostAndDB = parts[0]
+	}
+	parts = strings.Split(hostAndDB, "/")
+	if len(parts) == 1 {
+		//[host]
+		host, db = parts[0], 0 //default redis db
+	} else {
+		//[host, db]
+		host = parts[0]
+		db, err = strconv.Atoi(parts[1])
+		if err != nil {
+			db, err = 0, nil //ignore err here
+		}
+	}
+	return
+}
+
+// ParseRedisSocketURL extracts Redis connection options from a URL with the
+// redis+socket:// scheme. This scheme is not standard (or even de facto) and
+// is used as a transitional mechanism until the the config package gains the
+// proper facilities to support socket-based connections.
+func ParseRedisSocketURL(url string) (path, password string, db int, err error) {
+	parts := strings.Split(url, "redis+socket://")
+	if parts[0] != "" {
+		err = errors.New("No redis scheme found")
+		return
+	}
+
+	// redis+socket://password@/path/to/file.soc:/db
+
+	if len(parts) != 2 {
+		err = fmt.Errorf("Redis socket connection string should be in format redis+socket://password@/path/to/file.sock:/db, instead got %s", url)
+		return
+	}
+
+	remainder := parts[1]
+
+	// Extract password if any
+	parts = strings.SplitN(remainder, "@", 2)
+	if len(parts) == 2 {
+		password = parts[0]
+		remainder = parts[1]
+	} else {
+		remainder = parts[0]
+	}
+
+	// Extract path
+	parts = strings.SplitN(remainder, ":", 2)
+	path = parts[0]
+	if path == "" {
+		err = fmt.Errorf("Redis socket connection string should be in format redis+socket://password@/path/to/file.sock:/db, instead got %s", url)
+		return
+	}
+	if len(parts) == 2 {
+		remainder = parts[1]
+	}
+
+	// Extract DB if any
+	parts = strings.SplitN(remainder, "/", 2)
+	if len(parts) == 2 {
+		db, _ = strconv.Atoi(parts[1])
+	}
+
+	return
 }

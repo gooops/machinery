@@ -1,20 +1,22 @@
-package machinery
+package machinery_test
 
 import (
 	"testing"
 
+	machinery "github.com/RichardKnop/machinery/v1"
 	"github.com/RichardKnop/machinery/v1/signatures"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewChain(t *testing.T) {
 	task1 := signatures.TaskSignature{
 		Name: "foo",
 		Args: []signatures.TaskArg{
-			signatures.TaskArg{
+			{
 				Type:  "float64",
 				Value: interface{}(1),
 			},
-			signatures.TaskArg{
+			{
 				Type:  "float64",
 				Value: interface{}(1),
 			},
@@ -24,11 +26,11 @@ func TestNewChain(t *testing.T) {
 	task2 := signatures.TaskSignature{
 		Name: "bar",
 		Args: []signatures.TaskArg{
-			signatures.TaskArg{
+			{
 				Type:  "float64",
 				Value: interface{}(5),
 			},
-			signatures.TaskArg{
+			{
 				Type:  "float64",
 				Value: interface{}(6),
 			},
@@ -38,32 +40,18 @@ func TestNewChain(t *testing.T) {
 	task3 := signatures.TaskSignature{
 		Name: "qux",
 		Args: []signatures.TaskArg{
-			signatures.TaskArg{
+			{
 				Type:  "float64",
 				Value: interface{}(4),
 			},
 		},
 	}
 
-	chain := NewChain(&task1, &task2, &task3)
+	chain := machinery.NewChain(&task1, &task2, &task3)
 
 	firstTask := chain.Tasks[0]
 
-	if firstTask.Name != "foo" {
-		t.Errorf("firstTask.Name = %v, want foo", firstTask.Name)
-	}
-
-	if firstTask.OnSuccess[0].Name != "bar" {
-		t.Errorf(
-			"firstTask.OnSuccess[0].Name = %v, want bar",
-			firstTask.OnSuccess[0].Name,
-		)
-	}
-
-	if firstTask.OnSuccess[0].OnSuccess[0].Name != "qux" {
-		t.Errorf(
-			"firstTask.OnSuccess[0].OnSuccess[0].Name = %v, want qux",
-			firstTask.OnSuccess[0].OnSuccess[0].Name,
-		)
-	}
+	assert.Equal(t, "foo", firstTask.Name)
+	assert.Equal(t, "bar", firstTask.OnSuccess[0].Name)
+	assert.Equal(t, "qux", firstTask.OnSuccess[0].OnSuccess[0].Name)
 }

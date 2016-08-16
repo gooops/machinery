@@ -97,9 +97,9 @@ func (amqpBackend *AMQPBackend) GroupTaskStates(groupUUID string, groupTaskCount
 	for i := 0; i < groupTaskCount; i++ {
 		d := <-deliveries
 
-		taskState := &TaskState{}
+		taskState := new(TaskState)
 
-		if err := json.Unmarshal([]byte(d.Body), &taskState); err != nil {
+		if err := json.Unmarshal([]byte(d.Body), taskState); err != nil {
 			d.Nack(false, false) // multiple, requeue
 			return taskStates, err
 		}
@@ -154,7 +154,7 @@ func (amqpBackend *AMQPBackend) SetStateFailure(signature *signatures.TaskSignat
 // GetState - returns the latest task state. It will only return the status once
 // as the message will get consumed and removed from the queue.
 func (amqpBackend *AMQPBackend) GetState(taskUUID string) (*TaskState, error) {
-	taskState := TaskState{}
+	taskState := new(TaskState)
 
 	conn, channel, queue, _, err := amqpBackend.open(taskUUID)
 	if err != nil {
@@ -176,13 +176,13 @@ func (amqpBackend *AMQPBackend) GetState(taskUUID string) (*TaskState, error) {
 
 	d.Ack(false)
 
-	if err := json.Unmarshal([]byte(d.Body), &taskState); err != nil {
+	if err := json.Unmarshal([]byte(d.Body), taskState); err != nil {
 		log.Printf("Failed to unmarshal task state: %v", string(d.Body))
 		log.Print(err)
 		return nil, err
 	}
 
-	return &taskState, nil
+	return taskState, nil
 }
 
 // PurgeState - deletes stored task state
@@ -314,7 +314,9 @@ func (amqpBackend *AMQPBackend) open(taskUUID string) (*amqp.Connection, *amqp.C
 	)
 
 	// Connect
-	conn, err = amqp.Dial(amqpBackend.config.ResultBackend)
+	// From amqp docs: DialTLS will use the provided tls.Config when it encounters an amqps:// scheme
+	// and will dial a plain connection when it encounters an amqp:// scheme.
+	conn, err = amqp.DialTLS(amqpBackend.config.Broker, amqpBackend.config.TLSConfig)
 	if err != nil {
 		return conn, channel, queue, nil, fmt.Errorf("Dial: %s", err)
 	}
@@ -376,12 +378,16 @@ func (amqpBackend *AMQPBackend) open(taskUUID string) (*amqp.Connection, *amqp.C
 
 // Closes the connection
 func (amqpBackend *AMQPBackend) close(channel *amqp.Channel, conn *amqp.Connection) error {
-	if err := channel.Close(); err != nil {
-		return fmt.Errorf("Channel Close: %s", err)
+	if channel != nil {
+		if err := channel.Close(); err != nil {
+			return fmt.Errorf("Channel Close: %s", err)
+		}
 	}
 
-	if err := conn.Close(); err != nil {
-		return fmt.Errorf("Connection Close: %s", err)
+	if conn != nil {
+		if err := conn.Close(); err != nil {
+			return fmt.Errorf("Connection Close: %s", err)
+		}
 	}
 
 	return nil

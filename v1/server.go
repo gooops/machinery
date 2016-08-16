@@ -9,7 +9,7 @@ import (
 	"github.com/RichardKnop/machinery/v1/brokers"
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/RichardKnop/machinery/v1/signatures"
-	"github.com/pborman/uuid"
+	"github.com/RichardKnop/uuid"
 )
 
 // Server is the main Machinery object and stores all configuration
@@ -31,12 +31,12 @@ func NewServer(cnf *config.Config) (*Server, error) {
 	// Backend is optional so we ignore the error
 	backend, _ := BackendFactory(cnf)
 
-	srv, err := &Server{
+	srv := &Server{
 		config:          cnf,
 		registeredTasks: make(map[string]interface{}),
 		broker:          broker,
 		backend:         backend,
-	}, nil
+	}
 
 	// init for eager-mode
 	eager, ok := broker.(brokers.EagerMode)
@@ -46,7 +46,7 @@ func NewServer(cnf *config.Config) (*Server, error) {
 		eager.AssignWorker(srv.NewWorker("eager"))
 	}
 
-	return srv, err
+	return srv, nil
 }
 
 // NewWorker creates Worker instance
@@ -90,13 +90,13 @@ func (server *Server) SetConfig(cnf *config.Config) {
 // RegisterTasks registers all tasks at once
 func (server *Server) RegisterTasks(tasks map[string]interface{}) {
 	server.registeredTasks = tasks
-	server.broker.SetRegisteredTaskNames(server.getRegisteredTaskNames())
+	server.broker.SetRegisteredTaskNames(server.GetRegisteredTaskNames())
 }
 
 // RegisterTask registers a single task
 func (server *Server) RegisterTask(name string, task interface{}) {
 	server.registeredTasks[name] = task
-	server.broker.SetRegisteredTaskNames(server.getRegisteredTaskNames())
+	server.broker.SetRegisteredTaskNames(server.GetRegisteredTaskNames())
 }
 
 // IsTaskRegistered returns true if the task name is registered with this broker
@@ -212,12 +212,11 @@ func (server *Server) SendChord(chord *Chord) (*backends.ChordAsyncResult, error
 	), nil
 }
 
-func (server *Server) getRegisteredTaskNames() []string {
-	names := make([]string, len(server.registeredTasks))
-
-	for name, _ := range server.registeredTasks {
+// GetRegisteredTaskNames returns slice of registered task names
+func (server *Server) GetRegisteredTaskNames() []string {
+	var names []string
+	for name := range server.registeredTasks {
 		names = append(names, name)
 	}
-
 	return names
 }
