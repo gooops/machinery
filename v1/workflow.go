@@ -3,7 +3,7 @@ package machinery
 import (
 	"fmt"
 
-	"github.com/RichardKnop/machinery/v1/signatures"
+	"github.com/gooops/machinery/v1/signatures"
 	"github.com/RichardKnop/uuid"
 )
 

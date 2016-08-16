@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/signatures"
-	"github.com/RichardKnop/machinery/v1/utils"
+	"github.com/gooops/machinery/v1/config"
+	"github.com/gooops/machinery/v1/signatures"
+	"github.com/gooops/machinery/v1/utils"
 	"github.com/streadway/amqp"
 )
 

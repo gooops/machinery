@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/RichardKnop/machinery",
+	"ImportPath": "github.com/gooops/machinery",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v74",
 	"Packages": [
@@ -7,7 +7,7 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/RichardKnop/uuid",
+			"ImportPath": "github.com/gooops/uuid",
 			"Rev": "c55201b036063326c5b1b89ccfe45a184973d073"
 		},
 		{

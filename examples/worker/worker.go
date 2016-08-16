@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 
-	"github.com/RichardKnop/machinery/examples/tasks"
-	machinery "github.com/RichardKnop/machinery/v1"
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/errors"
+	"github.com/gooops/machinery/examples/tasks"
+	machinery "github.com/gooops/machinery/v1"
+	"github.com/gooops/machinery/v1/config"
+	"github.com/gooops/machinery/v1/errors"
 )
 
 // Define flags

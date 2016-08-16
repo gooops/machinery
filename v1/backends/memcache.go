@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/signatures"
+	"github.com/gooops/machinery/v1/config"
+	"github.com/gooops/machinery/v1/signatures"
 	"github.com/bradfitz/gomemcache/memcache"
 )
 

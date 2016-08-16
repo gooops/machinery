@@ -6,9 +6,9 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/RichardKnop/machinery/v1/backends"
-	"github.com/RichardKnop/machinery/v1/signatures"
-	"github.com/RichardKnop/machinery/v1/utils"
+	"github.com/gooops/machinery/v1/backends"
+	"github.com/gooops/machinery/v1/signatures"
+	"github.com/gooops/machinery/v1/utils"
 )
 
 // Worker represents a single worker process
@@ -74,13 +74,8 @@ func (worker *Worker) Process(signature *signatures.TaskSignature) error {
 
 	// Get task args and reflect them to proper types
 	reflectedTask := reflect.ValueOf(task)
-<<<<<<< HEAD
 	reflectedUUID := reflect.ValueOf(signature.UUID)
-	reflectedArgs, err := reflectArgs(signature.Args)
-	_ = reflectedArgs
-=======
 	reflectedArgs, err := ReflectArgs(signature.Args)
->>>>>>> upstream/master
 	if err != nil {
 		worker.finalizeError(signature, err)
 		return fmt.Errorf("Reflect task args: %v", err)
@@ -92,95 +87,27 @@ func (worker *Worker) Process(signature *signatures.TaskSignature) error {
 	}
 
 	// Call the task passing in the correct arguments
-<<<<<<< HEAD
 	// results, err := tryCall(reflectedTask, reflectedArgs)
-	results, err := tryCall(reflectedTask, reflectedArgs, reflectedUUID)
+	results, err := TryCall(reflectedTask, reflectedArgs, reflectedUUID)
 
 	if err != nil {
 		return worker.finalizeError(signature, err)
 	}
 
 	return worker.finalizeSuccess(signature, results[0])
-}
-
-// Converts []TaskArg to []reflect.Value
-func reflectArgs(args []signatures.TaskArg) ([]reflect.Value, error) {
-	argValues := make([]reflect.Value, len(args))
-	for i, arg := range args {
-		argValue, err := utils.ReflectValue(arg.Type, arg.Value)
-		if err != nil {
-			return nil, err
-		}
-		argValues[i] = argValue
-=======
-	results, err := TryCall(reflectedTask, reflectedArgs)
-
-	if err != nil {
-		return worker.finalizeError(signature, err)
->>>>>>> upstream/master
-	}
-
-	return worker.finalizeSuccess(signature, results[0])
-}
-
-// Attempts to call the task with the supplied arguments.
-//
-// `err` is set in the return value in two cases:
-// 1. The reflected function invocation panics (e.g. due to a mismatched
-//    argument list).
-// 2. The task func itself returns a non-nil error.
-func tryCall(f reflect.Value, args []reflect.Value, uuid reflect.Value) (results []reflect.Value, err error) {
-	defer func() {
-		// Recover from panic and set err.
-		if e := recover(); e != nil {
-			switch e := e.(type) {
-			default:
-				err = errors.New("Invoking task caused a panic")
-			case error:
-				err = e
-			case string:
-				err = errors.New(e)
-			}
-		}
-	}()
-
-	results = f.Call(append([]reflect.Value{uuid}, args...))
-
-	// If an error was returned by the task func, propagate it
-	// to the caller via err.
-	if !results[1].IsNil() {
-		return nil, results[1].Interface().(error)
-	}
-
-	return results, err
-}
-
-func createTaskResult(value reflect.Value) *backends.TaskResult {
-	return &backends.TaskResult{
-		Type:  reflect.TypeOf(value.Interface()).String(),
-		Value: value.Interface(),
-	}
 }
 
 // Task succeeded, update state and trigger success callbacks
 func (worker *Worker) finalizeSuccess(signature *signatures.TaskSignature, result reflect.Value) error {
 	// Update task state to SUCCESS
 	backend := worker.server.GetBackend()
-
-<<<<<<< HEAD
-	taskResult := createTaskResult(result)
-=======
 	taskResult := CreateTaskResult(result)
->>>>>>> upstream/master
 	if err := backend.SetStateSuccess(signature, taskResult); err != nil {
 		return fmt.Errorf("Set State Success: %v", err)
 	}
 
-<<<<<<< HEAD
 	// log.Printf("Processed %s. Result = %v", signature.UUID, taskResult.Value)
-=======
 	log.Printf("Processed %s. Result = %v", signature.UUID, taskResult.Value)
->>>>>>> upstream/master
 
 	// Trigger success callbacks
 	for _, successTask := range signature.OnSuccess {
@@ -301,7 +228,7 @@ func ReflectArgs(args []signatures.TaskArg) ([]reflect.Value, error) {
 // 1. The reflected function invocation panics (e.g. due to a mismatched
 //    argument list).
 // 2. The task func itself returns a non-nil error.
-func TryCall(f reflect.Value, args []reflect.Value) (results []reflect.Value, err error) {
+func TryCall(f reflect.Value, args []reflect.Value, uuid reflect.Value) (results []reflect.Value, err error) {
 	defer func() {
 		// Recover from panic and set err.
 		if e := recover(); e != nil {
@@ -316,8 +243,8 @@ func TryCall(f reflect.Value, args []reflect.Value) (results []reflect.Value, er
 		}
 	}()
 
-	results = f.Call(args)
-
+	// results = f.Call(args)
+	results = f.Call(append([]reflect.Value{uuid}, args...))
 	// If an error was returned by the task func, propagate it
 	// to the caller via err.
 	if !results[1].IsNil() {

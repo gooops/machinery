@@ -7,8 +7,8 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/RichardKnop/machinery/v1/signatures"
+	"github.com/gooops/machinery/v1/config"
+	"github.com/gooops/machinery/v1/signatures"
 )
 
 // MongodbBackend represents a MongoDB result backend
