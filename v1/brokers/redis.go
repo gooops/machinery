@@ -226,7 +226,7 @@ func (redisBroker *RedisBroker) consume(deliveries <-chan []byte, taskProcessor 
 	//   缓冲队列，控制并发
 	maxThread := 99999999
 	if redisBroker.config.ThreadConcurrency > 0 {
-		maxThread = redisBroker.config.ThreadConcurrency - 1
+		maxThread = redisBroker.config.ThreadConcurrency
 	}
 	pool := make(chan int, maxThread)
 	for {
