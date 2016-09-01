@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/garyburd/redigo/redis"
 	"github.com/gooops/machinery/v1/config"
 	"github.com/gooops/machinery/v1/signatures"
 	"github.com/gooops/machinery/v1/utils"
-	"github.com/garyburd/redigo/redis"
 )
 
 // RedisBroker represents a Redis broker
@@ -223,6 +223,12 @@ func (redisBroker *RedisBroker) consumeOne(item []byte, taskProcessor TaskProces
 
 // Consumes messages...
 func (redisBroker *RedisBroker) consume(deliveries <-chan []byte, taskProcessor TaskProcessor) error {
+	//   缓冲队列，控制并发
+	maxThread := 99999999
+	if redisBroker.config.ThreadConcurrency > 0 {
+		maxThread = redisBroker.config.ThreadConcurrency - 1
+	}
+	pool := make(chan int, maxThread)
 	for {
 		select {
 		case err := <-redisBroker.errorsChan:
@@ -230,8 +236,10 @@ func (redisBroker *RedisBroker) consume(deliveries <-chan []byte, taskProcessor 
 		case d := <-deliveries:
 			// Consume the task inside a gotourine so multiple tasks
 			// can be processed concurrently
+			pool <- 1
 			go func() {
 				redisBroker.consumeOne(d, taskProcessor)
+				<-pool
 			}()
 		case <-redisBroker.stopChan:
 			return nil

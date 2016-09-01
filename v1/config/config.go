@@ -14,6 +14,7 @@ type QueueBindingArguments map[string]interface{}
 // Config holds all configuration for our program
 type Config struct {
 	Broker                string                `yaml:"broker"`
+	ThreadConcurrency     int                   `yaml:"thread_concurrency"`
 	ResultBackend         string                `yaml:"result_backend"`
 	ResultsExpireIn       int                   `yaml:"results_expire_in"`
 	Exchange              string                `yaml:"exchange"`
