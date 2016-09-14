@@ -267,8 +267,9 @@ func (redisBroker *RedisBroker) open() (redis.Conn, error) {
 // Returns a new pool of Redis connections
 func (redisBroker *RedisBroker) newPool() *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
+		MaxIdle:     100,
+		IdleTimeout: 60 * time.Second,
+		MaxActive:   300,
 		Dial: func() (redis.Conn, error) {
 			var (
 				c    redis.Conn

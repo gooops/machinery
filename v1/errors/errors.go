@@ -1,15 +1,12 @@
 package errors
 
-import (
-	"log"
-)
+import "log"
 
 // Fail logs the error and exits the program
 // Only use this to handle critical errors
 func Fail(err error, msg string) {
 	if err != nil {
-		// log.Panicf("%s: %s", msg, err)
-		log.Println("[PANIC] %s: %s", msg, err)
+		log.Panicf("%s: %s", msg, err)
 	}
 }
 
