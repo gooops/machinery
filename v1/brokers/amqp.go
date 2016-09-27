@@ -143,6 +143,16 @@ func (amqpBroker *AMQPBroker) Publish(signature *signatures.TaskSignature) error
 	return fmt.Errorf("Failed delivery of delivery tag: %v", confirmed.DeliveryTag)
 }
 
+// DelPendingTask 从队列中删除一个任务
+func (amqpBroker *AMQPBroker) DelPendingTask(signature *signatures.TaskSignature) (n int64, err error) {
+	return
+}
+
+// GetALLPendingTasks returns a slice of all task.Signatures waiting in the queue
+func (amqpBroker *AMQPBroker) GetALLPendingTasks(queue string) (taskSignatures []*signatures.TaskSignature, err error) {
+	return taskSignatures, nil
+}
+
 // GetPendingTasks returns a slice of task.Signatures waiting in the queue
 func (amqpBroker *AMQPBroker) GetPendingTasks(queue string) ([]*signatures.TaskSignature, error) {
 	return nil, errors.New("Not implemented")

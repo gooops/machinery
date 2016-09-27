@@ -66,6 +66,16 @@ func (eagerBroker *EagerBroker) Publish(task *signatures.TaskSignature) error {
 	return eagerBroker.worker.Process(signature)
 }
 
+// DelPendingTask 从队列中删除一个任务
+func (eagerBroker *EagerBroker) DelPendingTask(signature *signatures.TaskSignature) (n int64, err error) {
+	return n, nil
+}
+
+// GetALLPendingTasks returns a slice of all task.Signatures waiting in the queue
+func (eagerBroker *EagerBroker) GetALLPendingTasks(queue string) (taskSignatures []*signatures.TaskSignature, err error) {
+	return taskSignatures, nil
+}
+
 // GetPendingTasks returns a slice of task.Signatures waiting in the queue
 func (eagerBroker *EagerBroker) GetPendingTasks(queue string) ([]*signatures.TaskSignature, error) {
 	return []*signatures.TaskSignature{}, errors.New("Not implemented")

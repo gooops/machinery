@@ -12,6 +12,8 @@ type Broker interface {
 	StopConsuming()
 	Publish(task *signatures.TaskSignature) error
 	GetPendingTasks(queue string) ([]*signatures.TaskSignature, error)
+	GetALLPendingTasks(queue string) ([]*signatures.TaskSignature, error)
+	DelPendingTask(signature *signatures.TaskSignature) (int64, error)
 }
 
 // TaskProcessor - can process a delivered task

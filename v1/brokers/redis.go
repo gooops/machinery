@@ -142,7 +142,6 @@ func (redisBroker *RedisBroker) StartConsuming(consumerTag string, taskProcessor
 	if err := redisBroker.consume(deliveries, taskProcessor); err != nil {
 		return redisBroker.retry, err // retry true
 	}
-
 	return redisBroker.retry, nil
 }
 
@@ -171,6 +170,57 @@ func (redisBroker *RedisBroker) Publish(signature *signatures.TaskSignature) err
 
 	_, err = conn.Do("RPUSH", redisBroker.config.DefaultQueue, message)
 	return err
+}
+
+// DelPendingTask 从队列中删除一个任务
+func (redisBroker *RedisBroker) DelPendingTask(signature *signatures.TaskSignature) (n int64, err error) {
+	conn, err := redisBroker.open()
+	if err != nil {
+		return n, fmt.Errorf("Dial: %s", err)
+	}
+	defer conn.Close()
+
+	message, err := json.Marshal(signature)
+	if err != nil {
+		return n, fmt.Errorf("JSON Encode Message: %v", err)
+	}
+
+	num, err := conn.Do("LREM", redisBroker.config.DefaultQueue, 0, message)
+	n = num.(int64)
+	return n, err
+}
+
+// GetALLPendingTasks returns a slice of all task.Signatures waiting in the queue
+func (redisBroker *RedisBroker) GetALLPendingTasks(queue string) ([]*signatures.TaskSignature, error) {
+	conn, err := redisBroker.open()
+	if err != nil {
+		return nil, fmt.Errorf("Dial: %s", err)
+	}
+	defer conn.Close()
+
+	if queue == "" {
+		queue = redisBroker.config.DefaultQueue
+	}
+	bytes, err := conn.Do("LRANGE", queue, 0, -1)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return nil, err
+	}
+	results, err := redis.ByteSlices(bytes, err)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return nil, err
+	}
+
+	var taskSignatures []*signatures.TaskSignature
+	for _, result := range results {
+		var taskSignature signatures.TaskSignature
+		if err := json.Unmarshal(result, &taskSignature); err != nil {
+			return nil, err
+		}
+		taskSignatures = append(taskSignatures, &taskSignature)
+	}
+	return taskSignatures, nil
 }
 
 // GetPendingTasks returns a slice of task.Signatures waiting in the queue
